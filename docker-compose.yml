@@ -1,0 +1,81 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+      - "${RABBITMQ_PORT}:5672"
+    networks:
+      - backend
+
+  customer-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - customer-db-data:/var/lib/postgresql/data
+      - ./customer-db-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - backend
+
+  account-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - account-db-data:/var/lib/postgresql/data
+      - ./account-db-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5434:5432"
+    networks:
+      - backend
+
+  customer-service:
+    build:
+      context: ../customer-microservice
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: customer-db
+      DB_NAME: db_customers_test
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8081:8081"
+    depends_on:
+      - customer-db
+      - rabbitmq
+    networks:
+      - backend
+
+  account-service:
+    build:
+      context: ../account-microservice
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: account-db
+      DB_NAME: db_accounts_test
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8082:8082"
+    depends_on:
+      - account-db
+      - rabbitmq
+    networks:
+      - backend
+
+volumes:
+  customer-db-data:
+  account-db-data:
+
+networks:
+  backend:
+    driver: bridge
